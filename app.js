@@ -70,6 +70,92 @@ app.post('/upload', upload.single('image'), (req, res) => {
 	res.redirect('/images');
 });
 
+// get / page
+app.get('/viewimages', (req, res) => {
+	if (!gfs) {
+		console.log('some error occured, check connection to db');
+		res.send('some error occured, check connection to db');
+		process.exit(0);
+	}
+	gfs.find().toArray((err, files) => {
+		// check if files
+		if (!files || files.length === 0) {
+			return res.render('view', {
+				files: false
+			});
+		} else {
+			const f = files
+				.map((file) => {
+					if (file.contentType === 'image/png' || file.contentType === 'image/jpeg') {
+						file.isImage = true;
+					} else {
+						file.isImage = false;
+					}
+					return file;
+				})
+				.sort((a, b) => {
+					return new Date(b['uploadDate']).getTime() - new Date(a['uploadDate']).getTime();
+				});
+
+			return res.render('view', {
+				files: f
+			});
+		}
+
+		// return res.json(files);
+	});
+});
+
+app.get('/viewimages', (req, res) => {
+	res.render('view');
+});
+
+app.get('/files', (req, res) => {
+	gfs.find().toArray((err, files) => {
+		// check if files
+		if (!files || files.length === 0) {
+			return res.status(404).json({
+				err: 'no files exist'
+			});
+		}
+
+		return res.json(files);
+	});
+});
+
+app.get('/files/:filename', (req, res) => {
+	gfs.find(
+		{
+			filename: req.params.filename
+		},
+		(err, file) => {
+			if (!file) {
+				return res.status(404).json({
+					err: 'no files exist'
+				});
+			}
+
+			return res.json(file);
+		}
+	);
+});
+
+app.get('/image/:filename', (req, res) => {
+	// console.log('id', req.params.id)
+	const file = gfs
+		.find({
+			filename: req.params.filename
+		})
+		.toArray((err, files) => {
+			if (!files || files.length === 0) {
+				return res.status(404).json({
+					err: 'no files exist'
+				});
+			}
+			gfs.openDownloadStreamByName(req.params.filename).pipe(res);
+		});
+});
+
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {
 	next(createError(404));
